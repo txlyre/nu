@@ -7,7 +7,7 @@
 #include <math.h>
 #include <sys/stat.h>
 
-#define VER "0.0.1"
+#define VER "0.0.2"
 
 typedef char * string;
 typedef string * strings;
