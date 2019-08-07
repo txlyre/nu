@@ -783,6 +783,9 @@ r(s)
       break;
       case 'N': ul(); break;
       case 'I': ui(); break;
+      case 'P': un(3.141592); break;
+      case 'T': un(6.283184); break;
+      case 'E': un(2.718281); break;
       case ' ': case '\n': case '\r': case '\t': break;
       default: e("syntax error", cts(s[i-1])); break;
     }
