@@ -5,6 +5,7 @@
 #include <setjmp.h>
 #include <time.h>
 #include <math.h>
+#include <sys/stat.h>
 
 #define VER "0.0.1"
 
@@ -42,8 +43,8 @@ none e(string, string);
 
 typedef struct 
 {
-  enum _T { t_num, t_str, t_nil, t_err, t_inf } type;
-  union { f32 num; string str; } value;
+  enum _T { t_num, t_str, t_nil, t_err, t_inf, t_file } type;
+  union { f32 num; string str; fl fle; } value;
 } Val;
 
 typedef struct _Entry
@@ -58,6 +59,7 @@ typedef struct _Entry
 #define NIL(x) (x.type == t_nil)
 #define ERR(x) (x.type == t_err)
 #define INF(x) (x.type == t_inf)
+#define FLE(x) (x.type == t_file)
 
 Val NIL;
 Val INF;
@@ -191,8 +193,10 @@ tn(x)
   i16 x;
 {
   if (x == t_num || x == t_inf) return "number";
-  else if(x == t_str) return "string";
-  else if(x == t_nil) return "nil";
+  else if (x == t_str) return "string";
+  else if (x == t_nil) return "nil";
+  else if (x == t_inf) return "infinity";
+  else if (x == t_file) return "file";
   else e("domain error", nil);
   return nil;
 }
@@ -412,6 +416,16 @@ us(s)
 }
 
 none
+uf(f)
+  fl f;
+{
+  Val n;
+  n.type = t_file;
+  n.value.fle = f;
+  u(n);
+}
+
+none
 p(x)
   Val x;
 {
@@ -423,7 +437,9 @@ p(x)
     printf(Quote?"\"%s\"":"%s", x.value.str);
   else if(NIL(x))
     printf("<nil>");
-   else e("domain error", nil);
+  else if(FLE(x))
+    printf("<file>");
+  else e("domain error", nil);
 }
 
 #define nl() printf("\n")
@@ -466,18 +482,53 @@ d(s)
 
 
 bool
+feq(f, ff)
+  fl f, ff;
+{
+  struct stat s, ss;
+  if(fstat((i16)f, &s) < 0) e("domain error", nil);
+  if(fstat((i16)ff, &ss) < 0) e("domain error", nil);
+  return (s.st_dev == ss.st_dev) && (s.st_ino == ss.st_ino);
+}
+
+bool
 cmp(x, y)
   Val x, y;
 {
   if (STR(x) && STR(y))
-    return EQS(x.value.str, y.value.str);
+     return EQS(x.value.str, y.value.str);
   else if (NUM(x) && NUM(y))
-   return x.value.num == y.value.num;
+    return x.value.num == y.value.num;
   else if (NIL(x) && NIL(y))
-   return true;
+    return true;
   else if (INF(x) && INF(y))
-   return true;
+    return true;
+  else if (FLE(x) && FLE(x))
+    return feq(x.value.fle, y.value.fle);    
   else return false;
+}
+
+#define ctf(x) ct(x, t_file); \
+              if (x.value.fle == nil) e("I/O operation on invalid file", nil);
+
+string
+cfm(s, b)
+  string s;
+  bool b;
+{
+  if (strlen(s) < 1 || strlen(s) > 2) e("invalid mode", s);
+  if (EQS(s, "r"))
+    return b?"rb":s;
+  else if (EQS(s, "w"))
+    return b?"wb":s;
+  else if (EQS(s, "a"))
+   return b?"ab":s;
+  else if (EQS(s, "r+"))
+   return b?"rb+":s;
+  else if (EQS(s, "w+"))
+   return b?"wb+":s;
+  else e("invalid mode", s);
+  return "";
 }
 
 none
@@ -487,6 +538,7 @@ r(s)
   i32 i, a;
   Val acc, x, y;
   string b, b2;
+  fl fd;
   //printf("\"%s\"\n", s);
   #define sym(c) (isdigit(c) || isalpha(c))
   #define name() for(a = 0, b = ""; s[i] && sym(s[i]) && a < 8; i++) { \
@@ -682,6 +734,53 @@ r(s)
         default: x = t(); ct(x, t_num); us(cts((i8)x.value.num)); i--; break;
       }
       break;
+      case 'f': switch(s[i++]) {
+        case 'o': 
+          y = t(); x = t();
+          ct(x, t_str); ct(y, t_str);
+          fd = fopen(x.value.str, cfm(y.value.str, true));
+          if (fd == nil) ul();
+          else uf(fd);
+        break;
+        case 'r':
+          x = t();
+          ctf(x);
+          fd = x.value.fle;
+          fseek(fd, 0, SEEK_END);
+          a = ftell(fd);
+          rewind(fd);
+          SRR(b, a + 1);
+          fread(b, 1, a, fd);
+          b[a] = '\0';
+          us(b);
+        break;
+        case 'w':
+          y = t(); x = t();
+          ctf(x); ct(y, t_str);
+          fd = x.value.fle;
+          SRR(b, strlen(y.value.str) + 1);
+          strncpy(b, y.value.str, strlen(y.value.str));
+          a = fwrite(b, sizeof(i8), sizeof(b), fd);
+          if (a != sizeof(b)) un(0);
+          else un(1);
+        break;
+        case 'l':
+          x = t();
+          ctf(x);
+          fd = x.value.fle;
+          SRR(b, 512);
+          if (fgets(b, 512, fd) == nil) ul();
+          else us(b);          
+        break;
+        case 'c':
+          x = t();
+          ct(x, t_file);
+          fd = x.value.fle;
+          if (fd != nil) fclose(fd);
+        break;
+        default: x = t(); if (x.type == t_file) un(1); else un(0); i--; break;
+      }
+      break;
       case 'N': ul(); break;
       case 'I': ui(); break;
       case ' ': case '\n': case '\r': case '\t': break;
@@ -691,7 +790,6 @@ r(s)
 bye:
   return;
 }
-
 
 none
 _load(p)
