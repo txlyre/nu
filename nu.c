@@ -463,6 +463,8 @@ d(s)
                              if (x.value.num != 0 && y.value.num == 0) ui(); \
                              else if(x.value.num == 0 && y.value.num == 0) ul(); \
                              else un(x.value.num op y.value.num)
+
+
 bool
 cmp(x, y)
   Val x, y;
@@ -551,7 +553,8 @@ r(s)
       case ':':
         if (!sym(s[i])) e("expected symbol after ':'", nil); 
         name();
-        b2 = strdup(b);
+        SRR(b2, strlen(b)+1);
+        strcpy(b2, b);
         if (s[i] == '\0' || s[i] == '\n') e("expected routine body after ':'", nil);
         for(b = ""; s[i] != '\n' && s[i] != '\0'; i++) {
           if (s[i] == '\r' || s[i] == '\n') { nx(); continue; }
@@ -630,6 +633,13 @@ r(s)
       break;
       case '*': AR(*); break;
       case '/': DIV(/); break;
+      case 'm':
+        y = t(); x = t(); 
+        isnu(x); isnu(y); 
+        if (x.value.num != 0 && y.value.num == 0) ui();
+        else if(x.value.num == 0 && y.value.num == 0) ul();
+        else un(fmod(x.value.num, y.value.num));
+      break;
       case '!': t(); break;
       case '&': u(s()); break;
       case '\\': y = t(); x = t(); u(y); u(x); break;
@@ -667,8 +677,7 @@ r(s)
             us("");
           else if (INF(x))
             us("infinity");
-          else e(ass(ass("cannot cast ", tn(x.type)), " to"), "string");
-          
+          else e(ass(ass("cannot cast ", tn(x.type)), " to"), "string");         
         break;
         default: x = t(); ct(x, t_num); us(cts((i8)x.value.num)); i--; break;
       }
@@ -740,7 +749,7 @@ rl()
     printf(": ");
     fgets(b, 64, In);
     i = strlen(b);
-    if (b[i-1] == '\n') b[i-1] = 0;
+    if (b[i-1] == '\n') b[i-1] = '\0';
     if (feof(In)) break;
     r(b);
     nl();
