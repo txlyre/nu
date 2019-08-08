@@ -7,14 +7,15 @@
 #include <math.h>
 #include <sys/stat.h>
 
-#define VER "0.0.2"
+#define VER "0.0.3"
 
 typedef char * string;
 typedef string * strings;
-typedef long i32;
-typedef unsigned long u32;
-typedef float f32;
+typedef long long i64;
+typedef unsigned long long u64;
+typedef double f64;
 typedef int i16;
+typedef struct timeval tv;
 typedef void none;
 typedef char i8;
 typedef enum { false, true } bool;
@@ -39,12 +40,13 @@ none e(string, string);
 
 #define SRR(n, s) n = MAS(s); MEC(n); n[0] = '\0'
 
-#define F32F "%.6g"
+#define F64F "%.15g"
+#define I64F "%lld"
 
 typedef struct 
 {
   enum _T { t_num, t_str, t_nil, t_err, t_inf, t_file } type;
-  union { f32 num; string str; fl fle; } value;
+  union { f64 num; string str; fl fle; } value;
 } Val;
 
 typedef struct _Entry
@@ -77,7 +79,7 @@ mkvs(s)
 
 Val
 mkvn(x)
-  f32 x;
+  f64 x;
 {
   Val n;
   if (x == INFINITY) {
@@ -91,8 +93,8 @@ mkvn(x)
 string Prl = nil;
 string File;
 string File2;
-i32 Line = 1;
-i32 Line2 = 1;
+i64 Line = 1;
+i64 Line2 = 1;
 jmp_buf J;
 
 #define TS 10
@@ -146,7 +148,7 @@ asc(s, c)
   string s;
   i8 c;
 {
-   i32 a = strlen(s);
+   i64 a = strlen(s);
    MKS(b, a + 2);
    strcpy(b, s);
    b[a] = c;
@@ -166,11 +168,11 @@ cts(c)
 
 string
 i2s(x)
-  i32 x;
+  i64 x;
 {
   i16 s = (i16)((ceil(log10(x))+2) * sizeof(i8));
   MKS(b, s);
-  snprintf(b, s, "%ld", x);
+  snprintf(b, s, I64F, x);
   return b;
 }
 
@@ -180,8 +182,8 @@ e(s, m)
 {
   fflush(Out);
   if (m && strlen(m) > 0)
-    fprintf(Err, "%s:%ld: %s: %s\n", File, Line, s, m);
-  else fprintf(Err, "%s:%ld: %s\n", File, Line, s);
+    fprintf(Err, "%s:" I64F ": %s: %s\n", File, Line, s, m);
+  else fprintf(Err, "%s:" I64F ": %s\n", File, Line, s);
   printf("\t%s\n", Prl);
   printf("\t~\n");
   ptrc();
@@ -245,12 +247,12 @@ isfu(s)
   return false;
 }
 
-i32
+i64
 h(s)
   string s;
 {
   string q;
-  i32 k;
+  i64 k;
   for (k = 0, q = s; *q; q++)
     k = (k<<3) ^ *q;
   return k % ES;
@@ -261,7 +263,7 @@ fj(s)
   string s;
 {
   En *p;
-  i32 k;
+  i64 k;
 
   k = h(s);
   for (p = Js[k]; p; p = p->n)
@@ -276,7 +278,7 @@ bj(s, x)
   Val x;
 {
   En *p;
-  i32 k;
+  i64 k;
 
   k = h(s);
   for (p = Js[k]; p; p = p->n)
@@ -297,7 +299,7 @@ f(s)
   string s;
 {
   En *p;
-  i32 k;
+  i64 k;
 
   k = h(s);
   for (p = E[k]; p; p = p->n)
@@ -312,7 +314,7 @@ bv(s, x)
   Val x;
 {
   En *p;
-  i32 k;
+  i64 k;
 
   k = h(s);
   for (p = E[k]; p; p = p->n)
@@ -330,8 +332,8 @@ bv(s, x)
 
 typedef struct _St 
 {
-  i32 t; 
-  u32 c;
+  i64 t; 
+  u64 c;
   Val *a;
 } St;
 
@@ -344,7 +346,7 @@ St *Rs;
 Val
 at(s, x)
   St *s;
-  i32 x;
+  i64 x;
 {
   if (x < 0 || x > s->c) return NIL;
   return s->a[x];
@@ -393,7 +395,7 @@ ui()
 
 none
 un(x)
-  f32 x;
+  f64 x;
 {
   if (x == INFINITY) {
     ui(); 
@@ -430,7 +432,7 @@ p(x)
   Val x;
 {
   if (NUM(x))
-    printf(F32F, x.value.num);
+    printf(F64F, x.value.num);
   else if(INF(x))
     printf("<infinity>");
   else if (STR(x))
@@ -454,7 +456,7 @@ d(s)
   }
 
   printf("[");
-  for(i32 i = 0; i < LN(s); i++) {
+  for(i64 i = 0; i < LN(s); i++) {
     Quote = true;
     p(at(s, i));
     Quote = false;
@@ -552,7 +554,7 @@ cfm(s, b)
                              goto away; \
                            } else if (EQS(s, "rand")) { \
                              x = t(); ct(x, t_num); \
-                             un((f32)rand()/(f32)(RAND_MAX/x.value.num)); \
+                             un((f64)rand()/(f64)(RAND_MAX/x.value.num)); \
                              goto away; \
                            } else if (EQS(s, "err")) { \
                              y = t(); x = t(); ct(x, t_str); \
@@ -569,10 +571,11 @@ none
 r(s)
   string s;
 {
-  i32 i, a;
+  i64 i, a;
   Val acc, x, y;
   string b, b2;
   fl fd;
+  tv ti;
   i16 ch;
   //printf("\"%s\"\n", s);
   #define sym(c) (isdigit(c) || isalpha(c))
@@ -621,7 +624,7 @@ r(s)
       break;
       case '#':
         if (!s[i] || s[i] < 1) e("expected a character after '#'", nil);
-        un((f32)s[i]);
+        un((f64)s[i]);
         nx();
       break;
       case '\'':              
@@ -684,7 +687,7 @@ away:
         rdb('(', ')');
         x = t();
         ct(x, t_num);
-        for (f32 cc = 1; cc != x.value.num+1; cc++) {
+        for (f64 cc = 1; cc != x.value.num+1; cc++) {
           bv("i", mkvn(cc));
           r(b);
         }
@@ -692,13 +695,13 @@ away:
       case '`':
         if (!sym(s[i])) e("expected symbol after '`'", nil); name();
         if (!ERR(fj(b))) e("label redefined", b);
-        bj(b, mkvn((f32)i));
+        bj(b, mkvn((f64)i));
       break;  
       case 'g':
         if (!sym(s[i])) e("expected symbol after 'g'", nil); name();
         acc = fj(b);
         if (ERR(acc)) e("undefined label", b);
-        i = (i32)acc.value.num;
+        i = (i64)acc.value.num;
       break;
       case '=':
         if (s[i] == '>') {
@@ -757,7 +760,7 @@ away:
           x = t(); 
           SRR(b, 128);
           if (NUM(x)) {
-            snprintf(b, 128, F32F, x.value.num);
+            snprintf(b, 128, F64F, x.value.num);
             us(b);
           } else if (STR(x))
             u(x);
@@ -765,9 +768,13 @@ away:
             us("");
           else if (INF(x))
             us("infinity");
-          else e(ass(ass("cannot cast ", tn(x.type)), " to"), "string");         
+          else { 
+            free(b);
+            e(ass(ass("cannot cast ", tn(x.type)), " to"), "string");         
+          }
+          free(b);
         break;
-        case 'c': x = t(); ct(x, t_str); if (strlen(x.value.str) != 1) e("expected a single-line string, got", x.value.str); un((f32)x.value.str[0]); break;
+        case 'c': x = t(); ct(x, t_str); if (strlen(x.value.str) != 1) e("expected a single-line string, got", x.value.str); un((f64)x.value.str[0]); break;
         default: x = t(); ct(x, t_num); us(cts((i8)x.value.num)); i--; break;
       }
       break;
@@ -790,6 +797,7 @@ away:
           fread(b, 1, a, fd);
           b[a] = '\0';
           us(b);
+          free(b);
         break;
         case 'i':
           x = t();
@@ -814,6 +822,7 @@ away:
           a = fwrite(b, sizeof(i8), sizeof(b), fd);
           if (a != sizeof(b)) un(0);
           else un(1);
+          free(b);
         break;
         case 'l':
           x = t();
@@ -822,6 +831,7 @@ away:
           SRR(b, 512);
           if (fgets(b, 512, fd) == nil) ul();
           else us(b);          
+          free(b);
         break;
         case 'c':
           x = t();
@@ -832,14 +842,22 @@ away:
         default: x = t(); if (x.type == t_file) un(1); else un(0); i--; break;
       }
       break;
+      case 't':
+        SRR(b, 513);
+        gettimeofday(&ti, nil);
+        snprintf(b, 512, "%lu.%lu", ti.tv_sec, ti.tv_usec);
+        un(atof(b));
+        free(b);
+      break;
       case 'N': ul(); break;
       case 'I': ui(); break;
-      case 'P': un(3.141592); break;
-      case 'T': un(6.283184); break;
-      case 'E': un(2.718281); break;
+      case 'P': un(3.141592653589793); break;
+      case 'T': un(6.283185307179586); break;
+      case 'E': un(2.718281828459045); break;
       case ' ': case '\n': case '\r': case '\t': break;
       default: e("syntax error", cts(s[i-1])); break;
     }
+    if (Prl) free(Prl);
   }
 bye:
   return;
@@ -895,7 +913,7 @@ rl()
   Line = 1;
   setjmp(J);
   buf(b, 65);  
-  i32 i;
+  i64 i;
   while (true) {
     rtrc();
     printf(": ");
@@ -930,7 +948,7 @@ init()
   INF.value.num = INFINITY;
   Error.type = t_err;
   En *a, *b;
-  for (i32 i = 0; i < ES; i++) {
+  for (i64 i = 0; i < ES; i++) {
     for (a = E[i]; a; a = b) {
       b = a->n;
       free(a);
