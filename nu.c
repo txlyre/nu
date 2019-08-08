@@ -503,7 +503,7 @@ cmp(x, y)
     return true;
   else if (INF(x) && INF(y))
     return true;
-  else if (FLE(x) && FLE(x))
+  else if (FLE(x) && FLE(y))
     return feq(x.value.fle, y.value.fle);    
   else return false;
 }
@@ -531,6 +531,40 @@ cfm(s, b)
   return "";
 }
 
+#define isb(s) (EQS(s, "and") \
+                          || EQS(s, "or") \
+                          || EQS(s, "not") \
+                          || EQS(s, "rand") \
+                          || EQS(s, "err"))
+#define chb(s) if (!isb(s)) goto skip; \
+                           L(s); \
+                           if (EQS(s, "and")) { \
+                             y = t(); x = t(); ct(x, t_num); ct(y, t_num); \
+                             un(x.value.num && y.value.num); \
+                             goto away; \
+                           } else if (EQS(s, "or")) { \
+                             y = t(); x = t(); ct(x, t_num); ct(y, t_num); \
+                             un(x.value.num || y.value.num); \
+                             goto away; \
+                           } else if (EQS(s, "not")) { \
+                             x = t(); ct(x, t_num); \
+                             un(!x.value.num); \
+                             goto away; \
+                           } else if (EQS(s, "rand")) { \
+                             x = t(); ct(x, t_num); \
+                             un((f32)rand()/(f32)(RAND_MAX/x.value.num)); \
+                             goto away; \
+                           } else if (EQS(s, "err")) { \
+                             y = t(); x = t(); ct(x, t_str); \
+                             if (NIL(y)) e(x.value.str, nil); \
+                             else { \
+                               ct(y, t_str); \
+                               e(x.value.str, y.value.str); \
+                             } \
+                             goto away; \
+                           } \
+                           skip:
+                           
 none
 r(s)
   string s;
@@ -539,6 +573,7 @@ r(s)
   Val acc, x, y;
   string b, b2;
   fl fd;
+  i16 ch;
   //printf("\"%s\"\n", s);
   #define sym(c) (isdigit(c) || isalpha(c))
   #define name() for(a = 0, b = ""; s[i] && sym(s[i]) && a < 8; i++) { \
@@ -605,6 +640,7 @@ r(s)
       case ':':
         if (!sym(s[i])) e("expected symbol after ':'", nil); 
         name();
+        if (isb(b)) e("built-in cannot be redefined", b);
         SRR(b2, strlen(b)+1);
         strcpy(b2, b);
         if (s[i] == '\0' || s[i] == '\n') e("expected routine body after ':'", nil);
@@ -617,6 +653,7 @@ r(s)
       break;
       case '@':
         if (!sym(s[i])) e("expected symbol after '@'", nil); name();
+        chb(b);
         acc = f(b);
         if (ERR(acc)) e("unbound symbol", b);
         else {
@@ -625,6 +662,7 @@ r(s)
           b = acc.value.str;
           r(b);
         }
+away:
       break;
       case '.': p(t()); break;
       case ',': SRR(b, 128); scanf("%[^\n]%*c", b); us(b); break;
@@ -663,8 +701,15 @@ r(s)
         i = (i32)acc.value.num;
       break;
       case '=':
-        y = t(); x = t();
-        un(cmp(x, y));
+        if (s[i] == '>') {
+          nx();
+          if (!sym(s[i])) e("expected symbol after '=>'", nil); 
+          name();
+          bv(b, t());
+        } else {
+          y = t(); x = t();
+          un(cmp(x, y));
+        }
       break;
       case '<':
         AR(<);
@@ -674,27 +719,18 @@ r(s)
       break;
       case '+': AR(+); break;
       case '-': 
-        if (s[i] == '>') {
-          nx();
-          if (!sym(s[i])) e("expected symbol after '->'", nil); 
-          name();
-          bv(b, t());
-        } else {
           AR(-); 
-        }
       break;
       case '*': AR(*); break;
-      case '/': DIV(/); break;
-      case 'm':
-        y = t(); x = t(); 
-        isnu(x); isnu(y); 
-        if (x.value.num != 0 && y.value.num == 0) ui();
-        else if(x.value.num == 0 && y.value.num == 0) ul();
-        else un(fmod(x.value.num, y.value.num));
+      case '/': 
+        DIV(/);      
+        un(fmod(x.value.num, y.value.num));
       break;
       case '!': t(); break;
       case '&': u(s()); break;
       case '\\': y = t(); x = t(); u(y); u(x); break;
+      case ';': y = t(); x = t(); u(x); u(x); u(y); break;
+      case '?': un(LN(S)); break;
       case '\0': case 'y': goto bye; break;
       case 'q': end(0); break;
       case '|':
@@ -731,6 +767,7 @@ r(s)
             us("infinity");
           else e(ass(ass("cannot cast ", tn(x.type)), " to"), "string");         
         break;
+        case 'c': x = t(); ct(x, t_str); if (strlen(x.value.str) != 1) e("expected a single-line string, got", x.value.str); un((f32)x.value.str[0]); break;
         default: x = t(); ct(x, t_num); us(cts((i8)x.value.num)); i--; break;
       }
       break;
@@ -753,6 +790,20 @@ r(s)
           fread(b, 1, a, fd);
           b[a] = '\0';
           us(b);
+        break;
+        case 'i':
+          x = t();
+          ctf(x);
+          fd = x.value.fle;
+          rewind(fd);
+        break;
+        case 'h':
+          x = t();
+          ctf(x);
+          fd = x.value.fle;
+          ch = fgetc(fd);
+          if (ch == EOF || ferror(fd) != 0) ul();
+          else us(cts((i8)ch));
         break;
         case 'w':
           y = t(); x = t();
@@ -891,6 +942,7 @@ init()
     SRR(Fs[i], 9);
   }
   rtrc();
+  srand(time(nil));
 }
 
 none
