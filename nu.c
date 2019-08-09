@@ -105,6 +105,8 @@ i16 Tt = 0;
                        strcpy(Trace[Tt], n); \
                        Tt++; \
                        if (Tt >= TS) Tt = 0
+#define UL Trace[Tt] = nil; \
+                    if (Tt != 0) Tt--
 
 none
 ptrc()
@@ -473,14 +475,16 @@ d(s)
 #define AR(op) LOP; \
                             y = t(); x = t();  \
                             isnu(x); isnu(y); \
-                            un(x.value.num op y.value.num)
+                            un(x.value.num op y.value.num); \
+                            UL
 
 #define DIV(op) LOP; \
                              y = t(); x = t(); \
                              isnu(x); isnu(y); \
                              if (x.value.num != 0 && y.value.num == 0) ui(); \
                              else if(x.value.num == 0 && y.value.num == 0) ul(); \
-                             else un(x.value.num op y.value.num)
+                             else un(x.value.num op y.value.num); \
+                             UL
 
 
 bool
@@ -664,8 +668,9 @@ r(s)
           L(b);
           b = acc.value.str;
           r(b);
-        }
-away:
+        } 
+      break;
+away: UL;
       break;
       case '.': p(t()); break;
       case ',': SRR(b, 128); scanf("%[^\n]%*c", b); us(b); break;
@@ -722,7 +727,7 @@ away:
       break;
       case '+': AR(+); break;
       case '-': 
-          AR(-); 
+          AR(-);
       break;
       case '*': AR(*); break;
       case '/': 
