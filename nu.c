@@ -96,6 +96,7 @@ string File;
 string File2;
 i64 Line = 1;
 i64 Line2 = 1;
+i64 C = 0;
 jmp_buf J;
 
 #define TS 10
@@ -196,8 +197,8 @@ e(s, m)
 {
   fflush(Out);
   if (m && strlen(m) > 0)
-    fprintf(Err, "%s:" I64F ": %s: %s\n", File, Line, s, m);
-  else fprintf(Err, "%s:" I64F ": %s\n", File, Line, s);
+    fprintf(Err, "%s:" I64F ":" I64F ": %s: %s\n", File, Line, C, s, m);
+  else fprintf(Err, "%s:" I64F ":" I64F ":  %s\n", File, Line, C, s);
   printf("\t%s\n", Prl);
   printf("\t~\n");
   ptrc();
@@ -564,7 +565,7 @@ r(s)
                                 a++; \
                               } \
                               if (strlen(b) > 8) e("symbol is too long", b)
-  #define nx()       if (s[i]) i++
+  #define nx()       if (s[i]) i++;
   #define nxe(s)   if (s[i]) i++; else e(s, nil)
   #define ex(s)     if (!s[i] || s[i] == '\0') e(s, nil);
   #define rdb(o, c)     a = 1; b = "";          \
@@ -580,7 +581,7 @@ r(s)
   for(i = 0;;) {
     SRR(Prl, strlen(&s[i])+1);
     strcpy(Prl, &s[i]);
-    
+    C = i+1;
     switch(s[i++]) {
       case '"':
         for(b = "", a = 0; s[i] && s[i] != '"'; i++) {
@@ -652,7 +653,7 @@ r(s)
           if (!isfu(b)) e("call of non-routine", b);
           L(b);
           b = acc.value.str;
-          r(b);
+          r(b);          
           UL;
         } 
       break;
@@ -856,6 +857,7 @@ _load(p)
     rtrc();
     r(b);
     Line++;
+    C = 0;
   }
   Line = Line2;
 }
@@ -897,6 +899,7 @@ rl()
   buf(b, 65);  
   i64 i;
   while (true) {
+    C = 0;
     rtrc();
     printf(": ");
     fgets(b, 64, In);
