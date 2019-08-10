@@ -6,6 +6,7 @@
 #include <time.h>
 #include <math.h>
 #include <sys/stat.h>
+#include <errno.h>
 
 #define VER "0.0.4"
 
@@ -175,6 +176,18 @@ i2s(x)
   MKS(b, s);
   snprintf(b, s, I64F, x);
   return b;
+}
+
+f64
+pf64(s)
+  string s;
+{
+  string err;
+  f64 r;
+  errno = 0;
+  r = strtod(s, &err);
+  if (r == 0 && !isspace(*err) && s == err) e("malformed number literal", s);
+  return r;
 }
 
 none 
@@ -596,10 +609,11 @@ r(s)
         nx();
       break;
       case '\'':              
+        if (!s[i] || (!isdigit(s[i]) && s[i] != '.')) e("expected a number literal after \"'\"", nil);
         for (b = ""; isdigit(s[i]) || s[i] == 'e' || s[i] == '.'; i++) {
           b = asc(b, s[i]);
         }
-        un(atof(b));
+        un(pf64(b));
       break;      
       case '%': x = t(); ct(x, t_num); un(-x.value.num); break;
       case '_':
@@ -717,7 +731,7 @@ away: UL;
            case 'n': 
              x = t(); 
              if (STR(x))
-               un(atof(x.value.str));
+               un(pf64(x.value.str));
            else if (NUM(x))
              u(x);
            else if (NIL(x))
