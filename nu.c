@@ -7,7 +7,7 @@
 #include <math.h>
 #include <sys/stat.h>
 
-#define VER "0.0.3"
+#define VER "0.0.4"
 
 typedef char * string;
 typedef string * strings;
@@ -139,8 +139,7 @@ ass(s, ss)
   string s, ss;
 {
   MKS(b, strlen(s) + strlen(ss) + 1);
-  b[0] = '\0';
-  strcat(b, s);
+  strcpy(b, s);
   strcat(b, ss);
   return b;
 }
@@ -210,7 +209,6 @@ tn(x)
 #define ES 999
 
 En *E[ES];
-En *Js[ES];
 strings Fs;
 i16 Fst = 0;
 #define OVFS(b) for (i16 i = 0; i < ES; i++) { b }
@@ -258,42 +256,6 @@ h(s)
   for (k = 0, q = s; *q; q++)
     k = (k<<3) ^ *q;
   return k % ES;
-}
-
-Val
-fj(s)
-  string s;
-{
-  En *p;
-  i64 k;
-
-  k = h(s);
-  for (p = Js[k]; p; p = p->n)
-    if (!strcmp(s, p->s))
-      return p->a;
-  return Error;
-}
-
-none
-bj(s, x)
-  string s;
-  Val x;
-{
-  En *p;
-  i64 k;
-
-  k = h(s);
-  for (p = Js[k]; p; p = p->n)
-    if (!strcmp(s, p->s)) {
-      p->a = x;
-      return;
-  }
-  p = malloc(sizeof(En));
-  strncpy(p->s, s, 8);
-  p->s[8] = '\0';
-  p->a = x;
-  p->n = Js[k];
-  Js[k] = p;
 }
 
 Val
@@ -576,6 +538,7 @@ r(s)
   string s;
 {
   i64 i, a;
+  bool bl;
   Val acc, x, y;
   string b, b2;
   fl fd;
@@ -597,7 +560,7 @@ r(s)
                                       if (s[i] == c) a--;     \
                                       if (s[i] == o) a++;   \
                                       if ((s[i] == '\0' || i >= strlen(s)-1) && a > 0) e("missing closing " #c " after " #o, nil); \
-                                      if (s[i] != c && a > 0) b = asc(b, s[i]); \
+                                      if (a > 0) b = asc(b, s[i]); \
                                       i++; \
                                    }
   for(i = 0;;) {
@@ -645,18 +608,25 @@ r(s)
         else u(acc);
       break;
       case ':':
-        if (!sym(s[i])) e("expected symbol after ':'", nil); 
+        if (!sym(s[i]) && s[i] == ':') {
+          bl = true;
+          nx();
+        } else bl = false;
+        if (!sym(s[i])) e(ass("expected symbol after ", bl?"'::'":"':'"), nil); 
         name();
-        if (isb(b)) e("built-in cannot be redefined", b);
+        if (!a && isb(b)) e("built-in cannot be redefined", b);
         SRR(b2, strlen(b)+1);
         strcpy(b2, b);
-        if (s[i] == '\0' || s[i] == '\n') e("expected routine body after ':'", nil);
-        for(b = ""; s[i] != '\n' && s[i] != '\0'; i++) {
-          if (s[i] == '\r' || s[i] == '\n') { nx(); continue; }
-          b = asc(b, s[i]);
+        if (s[i] != '(') e(ass("expected '(' after '::'", bl?"'::'":"':'"), nil);
+        nx();
+        rdb('(', ')');
+        if (bl) {
+          r(b);
+          bv(b2, t());
+        } else {
+          bv(b2, mkvs(b));
+          adf(b2);
         }
-        bv(b2, mkvs(b));
-        adf(b2);
       break;
       case '@':
         if (!sym(s[i])) e("expected symbol after '@'", nil); name();
@@ -668,6 +638,7 @@ r(s)
           L(b);
           b = acc.value.str;
           r(b);
+          UL;
         } 
       break;
 away: UL;
@@ -697,27 +668,9 @@ away: UL;
           r(b);
         }
       break;    
-      case '`':
-        if (!sym(s[i])) e("expected symbol after '`'", nil); name();
-        if (!ERR(fj(b))) e("label redefined", b);
-        bj(b, mkvn((f64)i));
-      break;  
-      case 'g':
-        if (!sym(s[i])) e("expected symbol after 'g'", nil); name();
-        acc = fj(b);
-        if (ERR(acc)) e("undefined label", b);
-        i = (i64)acc.value.num;
-      break;
       case '=':
-        if (s[i] == '>') {
-          nx();
-          if (!sym(s[i])) e("expected symbol after '=>'", nil); 
-          name();
-          bv(b, t());
-        } else {
-          y = t(); x = t();
-          un(cmp(x, y));
-        }
+        y = t(); x = t();
+        un(cmp(x, y));
       break;
       case '<':
         AR(<);
@@ -739,7 +692,7 @@ away: UL;
       case '\\': y = t(); x = t(); u(y); u(x); break;
       case ';': y = t(); x = t(); u(x); u(x); u(y); break;
       case '?': un(LN(S)); break;
-      case '\0': case 'y': goto bye; break;
+      case '\0': goto bye; break;
       case 'q': end(0); break;
       case '|':
         for(; s[i] && s[i] != '|'; i++) {
@@ -748,111 +701,118 @@ away: UL;
         if (s[i] != '|') e("non-terminated comment", nil);
         nx();
       break;
-      case 'c': switch(s[i++]) {
-        case 'n': 
-          x = t(); 
-          if (STR(x))
-            un(atof(x.value.str));
-          else if (NUM(x))
-            u(x);
-          else if (NIL(x))
-            ul();
-          else if (INF(x))
-            ui();
-          else e(ass(ass("cannot cast ", tn(x.type)), " to"), "number");
-        break;
-        case 's': 
-          x = t(); 
-          SRR(b, 128);
-          if (NUM(x)) {
-            snprintf(b, 128, F64F, x.value.num);
-            us(b);
-          } else if (STR(x))
-            u(x);
-          else if (NIL(x))
-            us("");
-          else if (INF(x))
-            us("infinity");
-          else { 
+      case '`':        
+        if (!isalpha(s[i])) e("expected a letter after '`'", nil);
+        switch(s[i]) {
+          case 'y': goto bye; break;
+          case 't':
+            SRR(b, 513);
+            gettimeofday(&ti, nil);
+            snprintf(b, 512, "%lu.%lu", ti.tv_sec, ti.tv_usec);
+            un(atof(b));
             free(b);
-            e(ass(ass("cannot cast ", tn(x.type)), " to"), "string");         
-          }
-          free(b);
+         break;
+         case 'c': switch(s[++i]) {
+           case 'n': 
+             x = t(); 
+             if (STR(x))
+               un(atof(x.value.str));
+           else if (NUM(x))
+             u(x);
+           else if (NIL(x))
+             ul();
+           else if (INF(x))
+             ui();
+           else e(ass(ass("cannot cast ", tn(x.type)), " to"), "number");
+         break;
+         case 's': 
+           x = t(); 
+           SRR(b, 128);
+           if (NUM(x)) {
+             snprintf(b, 128, F64F, x.value.num);
+             us(b);
+           } else if (STR(x))
+             u(x);
+           else if (NIL(x))
+             us("");
+           else if (INF(x))
+             us("infinity");
+           else { 
+             free(b);
+             e(ass(ass("cannot cast ", tn(x.type)), " to"), "string");         
+           }
+           free(b);
+         break;
+         case 'c': x = t(); ct(x, t_str); if (strlen(x.value.str) != 1) e("expected a one-character string, got", x.value.str); un((f64)x.value.str[0]); break;
+         case 'h': x = t(); ct(x, t_num); us(cts((i8)x.value.num)); break;
+         default: e("invalid syntax after 'c'", cts(s[i])); break;
+        }
         break;
-        case 'c': x = t(); ct(x, t_str); if (strlen(x.value.str) != 1) e("expected a single-line string, got", x.value.str); un((f64)x.value.str[0]); break;
-        default: x = t(); ct(x, t_num); us(cts((i8)x.value.num)); i--; break;
+        case 'f': switch(s[++i]) {
+          case 'o': 
+            y = t(); x = t();
+            ct(x, t_str); ct(y, t_str);
+            fd = fopen(x.value.str, cfm(y.value.str, true));
+            if (fd == nil) ul();
+            else uf(fd);
+          break;
+          case 'r':
+            x = t(); 
+            ctf(x);
+            fd = x.value.fle;
+            fseek(fd, 0, SEEK_END);
+            a = ftell(fd);
+            rewind(fd);
+            SRR(b, a + 1);
+            fread(b, 1, a, fd);
+            b[a] = '\0';
+            us(b);
+            free(b);
+          break;
+          case 'i':
+            x = t();
+            ctf(x);
+            fd = x.value.fle;
+            rewind(fd);
+          break;
+          case 'h':
+            x = t();
+            ctf(x);
+            fd = x.value.fle;
+            ch = fgetc(fd);
+            if (ch == EOF || ferror(fd) != 0) ul();
+            else us(cts((i8)ch));
+          break;
+          case 'w':
+            y = t(); x = t();
+            ctf(x); ct(y, t_str);
+            fd = x.value.fle;
+            SRR(b, strlen(y.value.str) + 1);
+            strncpy(b, y.value.str, strlen(y.value.str));
+            a = fwrite(b, sizeof(i8), sizeof(b), fd);
+            if (a != sizeof(b)) un(0);
+            else un(1);
+            free(b);
+          break;
+          case 'l':
+            x = t();
+            ctf(x);
+            fd = x.value.fle;
+            SRR(b, 512);
+            if (fgets(b, 512, fd) == nil) ul();
+            else us(b);          
+            free(b);
+          break;
+          case 'c':
+            x = t();
+            ct(x, t_file);
+            fd = x.value.fle;
+            if (fd != nil) fclose(fd);
+          break;
+          default: e("invalid syntax after 'f'", cts(s[i])); break;
+        }
       }
-      break;
-      case 'f': switch(s[i++]) {
-        case 'o': 
-          y = t(); x = t();
-          ct(x, t_str); ct(y, t_str);
-          fd = fopen(x.value.str, cfm(y.value.str, true));
-          if (fd == nil) ul();
-          else uf(fd);
-        break;
-        case 'r':
-          x = t();
-          ctf(x);
-          fd = x.value.fle;
-          fseek(fd, 0, SEEK_END);
-          a = ftell(fd);
-          rewind(fd);
-          SRR(b, a + 1);
-          fread(b, 1, a, fd);
-          b[a] = '\0';
-          us(b);
-          free(b);
-        break;
-        case 'i':
-          x = t();
-          ctf(x);
-          fd = x.value.fle;
-          rewind(fd);
-        break;
-        case 'h':
-          x = t();
-          ctf(x);
-          fd = x.value.fle;
-          ch = fgetc(fd);
-          if (ch == EOF || ferror(fd) != 0) ul();
-          else us(cts((i8)ch));
-        break;
-        case 'w':
-          y = t(); x = t();
-          ctf(x); ct(y, t_str);
-          fd = x.value.fle;
-          SRR(b, strlen(y.value.str) + 1);
-          strncpy(b, y.value.str, strlen(y.value.str));
-          a = fwrite(b, sizeof(i8), sizeof(b), fd);
-          if (a != sizeof(b)) un(0);
-          else un(1);
-          free(b);
-        break;
-        case 'l':
-          x = t();
-          ctf(x);
-          fd = x.value.fle;
-          SRR(b, 512);
-          if (fgets(b, 512, fd) == nil) ul();
-          else us(b);          
-          free(b);
-        break;
-        case 'c':
-          x = t();
-          ct(x, t_file);
-          fd = x.value.fle;
-          if (fd != nil) fclose(fd);
-        break;
-        default: x = t(); if (x.type == t_file) un(1); else un(0); i--; break;
-      }
-      break;
-      case 't':
-        SRR(b, 513);
-        gettimeofday(&ti, nil);
-        snprintf(b, 512, "%lu.%lu", ti.tv_sec, ti.tv_usec);
-        un(atof(b));
-        free(b);
+      nx();
       break;
       case 'N': ul(); break;
       case 'I': ui(); break;
