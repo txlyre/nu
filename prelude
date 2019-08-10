@@ -1,8 +1,8 @@
 | A simple prelude for Nu |
-:succ'1+
-:pred'1-
-:nl"~n".
-:pr.@nl
-:mod/\!
-:fac'1\(_i*)
-:flr&"r"fo&N=[!"open error"\@err]\!&fr\fc
+:succ('1+)
+:pred('1-)
+:nl("~n".)
+:pr(.@nl)
+:mod(/\!)
+:fac('1\(_i*))
+:flr(&"r"`fo&N=[!"open error"\@err]\!&`fr\`fc)
