@@ -533,7 +533,7 @@ cfm(s, b)
                            } \
                            skip:
                            
-none
+i64
 r(s)
   string s;
 {
@@ -563,6 +563,7 @@ r(s)
                                       if (a > 0) b = asc(b, s[i]); \
                                       i++; \
                                    }
+  #define cey(x) if (x == 1) goto bye;
   for(i = 0;;) {
     SRR(Prl, strlen(&s[i])+1);
     strcpy(Prl, &s[i]);
@@ -649,14 +650,14 @@ away: UL;
         x = t(); 
         ct(x, t_num);
         rdb('[', ']');
-        if (x.value.num == 1) r(b);
+        if (x.value.num == 1) cey(r(b));
       break;      
       case '{':
         rdb('{', '}');
         while (true) {
           x =  t(); ct(x, t_num);
           if (x.value.num == 1) break;
-          r(b);
+          cey(r(b));
         }
       break;      
       case '(':
@@ -665,7 +666,7 @@ away: UL;
         ct(x, t_num);
         for (f64 cc = 1; cc != x.value.num+1; cc++) {
           bv("i", mkvn(cc));
-          r(b);
+          cey(r(b));
         }
       break;    
       case '=':
@@ -692,7 +693,7 @@ away: UL;
       case '\\': y = t(); x = t(); u(y); u(x); break;
       case ';': y = t(); x = t(); u(x); u(x); u(y); break;
       case '?': un(LN(S)); break;
-      case '\0': goto bye; break;
+      case '\0': goto ok; break;
       case 'q': end(0); break;
       case '|':
         for(; s[i] && s[i] != '|'; i++) {
@@ -824,8 +825,10 @@ away: UL;
     }
     if (Prl) free(Prl);
   }
+ok:
+  return 0;
 bye:
-  return;
+  return 1;
 }
 
 none
