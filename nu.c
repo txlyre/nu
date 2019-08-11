@@ -335,7 +335,7 @@ none
 _u(s, x)
   St *s;
   Val x;     
-{
+{ 
   if (LN(s) == s->c - 1) e("stack overflow", nil);
   s->a[++s->t] = x;
 }
@@ -415,7 +415,7 @@ p(x)
   else if(INF(x))
     printf("<infinity>");
   else if (STR(x))
-    printf(Quote?"\"%s\"":"%s", x.value.str);
+    printf((strlen(x.value.str) == 1 && Quote)?"'%s'":Quote?"\"%s\"":"%s", x.value.str);
   else if(NIL(x))
     printf("<nil>");
   else if(FLE(x))
@@ -518,7 +518,8 @@ cfm(s, b)
                           || EQS(s, "or") \
                           || EQS(s, "not") \
                           || EQS(s, "rand") \
-                          || EQS(s, "err"))
+                          || EQS(s, "err") \
+                          || EQS(s, "at"))
 #define chb(s) if (!isb(s)) goto skip; \
                            L(s); \
                            if (EQS(s, "and")) { \
@@ -545,6 +546,12 @@ cfm(s, b)
                                e(x.value.str, y.value.str); \
                              } \
                              goto away; \
+                           } else if (EQS(s, "at")) { \
+                             y = t(); x = t(); ct(x, t_str); ct(y, t_num); \
+                             if (y.value.num < 0 || (i64)y.value.num >= strlen(x.value.str)) \
+                               ul(); \
+                             else us(cts(x.value.str[(i64)y.value.num])); \
+                             goto away; \
                            } \
                            skip:
                            
@@ -559,7 +566,6 @@ r(s)
   fl fd;
   tv ti;
   i16 ch;
-  //printf("\"%s\"\n", s);
   #define sym(c) (isdigit(c) || isalpha(c))
   #define name() for(a = 0, b = ""; s[i] && sym(s[i]) && a < 8; i++) { \
                                 b = asc(b, s[i]); \
