@@ -671,7 +671,7 @@ away: UL;
         rdb('{', '}');
         while (true) {
           x =  t(); ct(x, t_num);
-          if (x.value.num == 1) break;
+          if (x.value.num == 0) break;
           cey(r(b));
         }
       break;      
