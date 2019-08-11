@@ -701,6 +701,14 @@ away: UL;
       case '>':
         AR(>);
       break;
+      case '~':
+        x = t(); ct(x, t_num);
+        if (x.value.num == 0) 
+          un(1);
+        else if (x.value.num == 1)
+          un(0);
+        else u(x);
+      break;
       case '+': AR(+); break;
       case '-': 
           AR(-);
@@ -755,6 +763,12 @@ away: UL;
         if (!isalpha(s[i])) e("expected a letter after '`'", nil);
         switch(s[i]) {
           case 'y': goto bye; break;
+          case 'o':
+            AR(||);
+          break;
+          case 'a':
+            AR(&&);
+          break;
           case 't':
             SRR(b, 513);
             gettimeofday(&ti, nil);
