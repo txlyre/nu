@@ -198,7 +198,7 @@ e(s, m)
   fflush(Out);
   if (m && strlen(m) > 0)
     fprintf(Err, "%s:" I64F ":" I64F ": %s: %s\n", File, Line, C, s, m);
-  else fprintf(Err, "%s:" I64F ":" I64F ":  %s\n", File, Line, C, s);
+  else fprintf(Err, "%s:" I64F ":" I64F ": %s\n", File, Line, C, s);
   printf("\t%s\n", Prl);
   printf("\t~\n");
   ptrc();
@@ -327,6 +327,7 @@ at(s, x)
   i64 x;
 {
   if (x < 0 || x > s->c) return NIL;
+  if (x > s->t) return NIL;
   return s->a[x];
 }
 
@@ -703,6 +704,33 @@ away: UL;
         DIV(/);      
         un(fmod(x.value.num, y.value.num));
       break;
+      case '$': switch(s[i++]) {
+        case '!': _t(Rs); break;
+        case '&': _u(Rs, _s(Rs)); break;
+        case '\\': y = _t(Rs); x = _t(Rs); _u(Rs, y); _u(Rs, x); break;
+        case '?': un(LN(Rs)); break;
+        case 'c':
+          while (!EM(Rs)) {
+            u(_t(Rs));
+          }
+        break;
+        case 'o':
+          while (!EM(S)) {
+            _u(Rs, t());
+          }
+        break; 
+        case 's': u(_s(Rs)); break;
+        case 'g': u(_t(Rs)); break;
+        case 'r':
+          Rs = (St *)malloc(sizeof(St));
+          MEC(Rs);
+          Rs->c = MS;
+          Rs->t = -1;
+          Rs->a = (Val *)malloc(Rs->c * sizeof(Val));
+        break;
+        default: _u(Rs, t()); i--; break;
+      }
+      break;
       case '!': t(); break;
       case '&': u(s()); break;
       case '\\': y = t(); x = t(); u(y); u(x); break;
@@ -909,6 +937,7 @@ rl()
     r(b);
     nl();
     d(S);
+    d(Rs);
   }
 }
 
