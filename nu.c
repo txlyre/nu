@@ -566,15 +566,13 @@ r(s)
   fl fd;
   tv ti;
   i16 ch;
-  #define sym(c) (isdigit(c) || isalpha(c))
+  #define sym(c) (isalnum(c))
   #define name() for(a = 0, b = ""; s[i] && sym(s[i]) && a < 8; i++) { \
                                 b = asc(b, s[i]); \
                                 a++; \
                               } \
                               if (strlen(b) > 8) e("symbol is too long", b)
   #define nx()       if (s[i]) i++;
-  #define nxe(s)   if (s[i]) i++; else e(s, nil)
-  #define ex(s)     if (!s[i] || s[i] == '\0') e(s, nil);
   #define rdb(o, c)     a = 1; b = "";          \
                                     while (true) {          \
                                       if (a == 0) break;  \
@@ -637,10 +635,10 @@ r(s)
         } else bl = false;
         if (!sym(s[i])) e(ass("expected symbol after ", bl?"'::'":"':'"), nil); 
         name();
-        if (!a && isb(b)) e("built-in cannot be redefined", b);
+        if (isb(b)) e("built-in cannot be redefined", b);
         SRR(b2, strlen(b)+1);
         strcpy(b2, b);
-        if (s[i] != '(') e(ass("expected '(' after '::'", bl?"'::'":"':'"), nil);
+        if (s[i] != '(') e(ass("expected '(' after ", bl?"'::'":"':'"), nil);
         nx();
         rdb('(', ')');
         if (bl) {
