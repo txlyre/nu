@@ -6,7 +6,6 @@
 #include <time.h>
 #include <math.h>
 #include <sys/stat.h>
-#include <errno.h>
 
 #define VER "0.0.4"
 
@@ -185,7 +184,6 @@ pf64(s)
 {
   string err;
   f64 r;
-  errno = 0;
   r = strtod(s, &err);
   if (r == 0 && !isspace(*err) && s == err) e("malformed number literal", s);
   return r;
